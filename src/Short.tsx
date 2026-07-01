@@ -10,6 +10,29 @@ import {
 } from 'remotion';
 
 // ============================================================================
+// SHARED LAYOUT
+// Bag's settled position/size, shared across scenes so it never visually
+// shifts when a new scene's Sequence takes over.
+// ============================================================================
+
+const BACKGROUND_IMAGE = 'images/processed/background.jpeg';
+const BAG_CASH_IMAGE = 'images/processed/bag-cash.png';
+
+const BAG_WIDTH = '65%';
+const BAG_PADDING_BOTTOM = '20%';
+
+const SceneBackground: React.FC = () => (
+	<Img
+		src={staticFile(BACKGROUND_IMAGE)}
+		style={{
+			width: '100%',
+			height: '100%',
+			objectFit: 'cover',
+		}}
+	/>
+);
+
+// ============================================================================
 // SCENE 1 — "What if you randomly found $1,000,000… in cash?"
 // Frames 0-120 (0.0s-4.0s @ 30fps)
 //
@@ -46,25 +69,70 @@ const Scene1: React.FC = () => {
 
 	return (
 		<AbsoluteFill>
-			<Img
-				src={staticFile('images/processed/background.jpeg')}
-				style={{
-					width: '100%',
-					height: '100%',
-					objectFit: 'cover',
-				}}
-			/>
+			<SceneBackground />
 			<AbsoluteFill
 				style={{
 					justifyContent: 'flex-end',
 					alignItems: 'center',
-					paddingBottom: '20%',
+					paddingBottom: BAG_PADDING_BOTTOM,
 				}}
 			>
 				<Img
-					src={staticFile('images/processed/bag-cash.png')}
+					src={staticFile(BAG_CASH_IMAGE)}
 					style={{
-						width: '65%',
+						width: BAG_WIDTH,
+						transform: `scale(${bagScale})`,
+					}}
+				/>
+			</AbsoluteFill>
+		</AbsoluteFill>
+	);
+};
+
+// ============================================================================
+// SCENE 2 — "Like just sitting there."
+// Frames 120-180 (4.0s-6.0s @ 30fps)
+//
+// - Same background, bag remains in its Scene 1 settled position/size.
+// - Local frames 0-30 (global 4.0s-5.0s): bag holds completely still.
+// - Local frames 30-60 (global 5.0s-6.0s): a barely-there idle "breathing"
+//   wobble (~1% scale, one slow sine cycle) — no pop, no bounce.
+// ============================================================================
+
+const SCENE_2_VO = 'Like just sitting there.';
+const SCENE_2_DURATION = 60;
+
+// Local frame where the micro-movement is allowed to begin; before this the
+// bag is pixel-static.
+const SCENE_2_IDLE_START = 30;
+const SCENE_2_IDLE_AMPLITUDE = 0.01; // 1% scale wobble, intentionally subtle
+
+const Scene2: React.FC = () => {
+	const frame = useCurrentFrame();
+
+	const idleFrame = Math.max(0, frame - SCENE_2_IDLE_START);
+	const idleDuration = SCENE_2_DURATION - SCENE_2_IDLE_START;
+	const idleWobble =
+		frame < SCENE_2_IDLE_START
+			? 0
+			: Math.sin((idleFrame / idleDuration) * Math.PI * 2) * SCENE_2_IDLE_AMPLITUDE;
+
+	const bagScale = 1 + idleWobble;
+
+	return (
+		<AbsoluteFill>
+			<SceneBackground />
+			<AbsoluteFill
+				style={{
+					justifyContent: 'flex-end',
+					alignItems: 'center',
+					paddingBottom: BAG_PADDING_BOTTOM,
+				}}
+			>
+				<Img
+					src={staticFile(BAG_CASH_IMAGE)}
+					style={{
+						width: BAG_WIDTH,
 						transform: `scale(${bagScale})`,
 					}}
 				/>
@@ -88,7 +156,15 @@ export const Short: React.FC = () => {
 				<Scene1 />
 			</Sequence>
 
-			{/* Scene 2 goes here: <Sequence from={SCENE_1_DURATION} durationInFrames={...}> */}
+			<Sequence
+				from={SCENE_1_DURATION}
+				durationInFrames={SCENE_2_DURATION}
+				name={`Scene 2 — VO: "${SCENE_2_VO}"`}
+			>
+				<Scene2 />
+			</Sequence>
+
+			{/* Scene 3 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION} durationInFrames={...}> */}
 		</AbsoluteFill>
 	);
 };
