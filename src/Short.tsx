@@ -11,15 +11,16 @@ import {
 
 // ============================================================================
 // SHARED LAYOUT
-// Bag's settled position/size, shared across scenes so it never visually
-// shifts when a new scene's Sequence takes over.
+// Once an element (bag, hook text, tag, ...) has settled in a scene, it
+// keeps appearing in every later scene at the exact same size/position via
+// these shared components (rendered with scale=1, i.e. no transform), so
+// nothing ever visually jumps at a scene cut.
 // ============================================================================
 
 const BACKGROUND_IMAGE = 'images/processed/background.jpeg';
 const BAG_CASH_IMAGE = 'images/processed/bag-cash.png';
-
-const BAG_WIDTH = '65%';
-const BAG_PADDING_BOTTOM = '20%';
+const TAG_IMAGE = 'images/processed/blank-tag.png';
+const PERSON_REACHING_IMAGE = 'images/processed/person-reaching.png';
 
 // Punchy, quick-settling spring shared by any element that needs a snappy
 // pop-in bounce inside a short (~20-30 frame) window, as opposed to the
@@ -37,6 +38,102 @@ const SceneBackground: React.FC = () => (
 	/>
 );
 
+const BAG_WIDTH = '65%';
+const BAG_PADDING_BOTTOM = '20%';
+
+const Bag: React.FC<{scale?: number}> = ({scale = 1}) => (
+	<AbsoluteFill
+		style={{
+			justifyContent: 'flex-end',
+			alignItems: 'center',
+			paddingBottom: BAG_PADDING_BOTTOM,
+		}}
+	>
+		<Img
+			src={staticFile(BAG_CASH_IMAGE)}
+			style={{
+				width: BAG_WIDTH,
+				transform: `scale(${scale})`,
+			}}
+		/>
+	</AbsoluteFill>
+);
+
+const HOOK_TEXT = '$1,000,000';
+
+const HookText: React.FC<{scale?: number}> = ({scale = 1}) => (
+	<AbsoluteFill
+		style={{
+			justifyContent: 'flex-start',
+			alignItems: 'center',
+			paddingTop: '15%',
+		}}
+	>
+		<div
+			style={{
+				transform: `scale(${scale})`,
+				fontFamily: 'Arial, Helvetica, sans-serif',
+				fontWeight: 900,
+				fontSize: 130,
+				color: '#ffffff',
+				textAlign: 'center',
+				WebkitTextStroke: '10px #000000',
+				paintOrder: 'stroke fill',
+				textShadow: '0 0 30px rgba(34, 197, 94, 0.85), 0 0 70px rgba(34, 197, 94, 0.55)',
+			}}
+		>
+			{HOOK_TEXT}
+		</div>
+	</AbsoluteFill>
+);
+
+const TAG_WIDTH_PX = 220;
+// Anchored near the bag's right shoulder/handle-base, just below the handle
+// loop. The tag's own loop sits at its left edge, so the element is nudged
+// left/up from this anchor rather than centered on it.
+const TAG_ANCHOR_LEFT = '66%';
+const TAG_ANCHOR_TOP = '32%';
+
+const Tag: React.FC<{scale?: number}> = ({scale = 1}) => (
+	<div
+		style={{
+			position: 'absolute',
+			left: TAG_ANCHOR_LEFT,
+			top: TAG_ANCHOR_TOP,
+			transform: `translate(-15%, -35%) scale(${scale})`,
+		}}
+	>
+		<Img src={staticFile(TAG_IMAGE)} style={{width: TAG_WIDTH_PX, display: 'block'}} />
+	</div>
+);
+
+// person-reaching.png's content (a crouching figure reaching rightward) only
+// fills the middle band of its 768x1376 canvas. Instead of relying on flex
+// alignment (which would anchor the mostly-transparent image box, not the
+// visible figure), it's positioned with an explicit top-left so the
+// figure's feet line up with the same ground line the bag stands on
+// (frame bottom minus BAG_PADDING_BOTTOM, i.e. y=1536 on a 1920-tall frame).
+const PERSON_WIDTH_PX = 500;
+const PERSON_LEFT_PX = 0;
+const PERSON_TOP_PX = 851;
+
+const PersonReaching: React.FC<{scale?: number}> = ({scale = 1}) => (
+	<div
+		style={{
+			position: 'absolute',
+			left: PERSON_LEFT_PX,
+			top: PERSON_TOP_PX,
+			transformOrigin: 'bottom left',
+			transform: `scale(${scale})`,
+		}}
+	>
+		<Img
+			src={staticFile(PERSON_REACHING_IMAGE)}
+			style={{width: PERSON_WIDTH_PX, display: 'block'}}
+		/>
+	</div>
+);
+
 // ============================================================================
 // SCENE 1 — "What if you randomly found $1,000,000… in cash?"
 // Frames 0-120 (0.0s-4.0s @ 30fps)
@@ -44,6 +141,7 @@ const SceneBackground: React.FC = () => (
 // - background.jpeg fills the frame
 // - bag-cash.png is centered, lower-middle of the screen, scaling in with an
 //   overshoot bounce (0-45), settling (45-60), then fully static (60-120).
+// - "$1,000,000" pops in above the bag once it's mostly settled.
 // ============================================================================
 
 const SCENE_1_VO = 'What if you randomly found $1,000,000… in cash?';
@@ -57,7 +155,6 @@ const SCENE_1_SETTLE_FRAME = 60;
 
 // "$1,000,000" hook text: pops in on its own spring once the bag has mostly
 // settled, and is fully locked in well before the bag's own hold begins.
-const SCENE_1_TEXT = '$1,000,000';
 const SCENE_1_TEXT_START_FRAME = 30;
 const SCENE_1_TEXT_SETTLE_OFFSET = 20; // settles at frame 30 + 20 = 50
 
@@ -96,47 +193,8 @@ const Scene1: React.FC = () => {
 	return (
 		<AbsoluteFill>
 			<SceneBackground />
-			<AbsoluteFill
-				style={{
-					justifyContent: 'flex-start',
-					alignItems: 'center',
-					paddingTop: '15%',
-				}}
-			>
-				{textVisible ? (
-					<div
-						style={{
-							transform: `scale(${textScale})`,
-							fontFamily: 'Arial, Helvetica, sans-serif',
-							fontWeight: 900,
-							fontSize: 130,
-							color: '#ffffff',
-							textAlign: 'center',
-							WebkitTextStroke: '10px #000000',
-							paintOrder: 'stroke fill',
-							textShadow:
-								'0 0 30px rgba(34, 197, 94, 0.85), 0 0 70px rgba(34, 197, 94, 0.55)',
-						}}
-					>
-						{SCENE_1_TEXT}
-					</div>
-				) : null}
-			</AbsoluteFill>
-			<AbsoluteFill
-				style={{
-					justifyContent: 'flex-end',
-					alignItems: 'center',
-					paddingBottom: BAG_PADDING_BOTTOM,
-				}}
-			>
-				<Img
-					src={staticFile(BAG_CASH_IMAGE)}
-					style={{
-						width: BAG_WIDTH,
-						transform: `scale(${bagScale})`,
-					}}
-				/>
-			</AbsoluteFill>
+			{textVisible ? <HookText scale={textScale} /> : null}
+			<Bag scale={bagScale} />
 		</AbsoluteFill>
 	);
 };
@@ -145,7 +203,8 @@ const Scene1: React.FC = () => {
 // SCENE 2 — "Like just sitting there."
 // Frames 120-180 (4.0s-6.0s @ 30fps)
 //
-// - Same background, bag remains in its Scene 1 settled position/size.
+// - Same background; bag and "$1,000,000" text remain in their Scene 1
+//   settled positions.
 // - Local frames 0-30 (global 4.0s-5.0s): bag holds completely still.
 // - Local frames 30-60 (global 5.0s-6.0s): a barely-there idle "breathing"
 //   wobble (~1% scale, one slow sine cycle) — no pop, no bounce.
@@ -174,21 +233,8 @@ const Scene2: React.FC = () => {
 	return (
 		<AbsoluteFill>
 			<SceneBackground />
-			<AbsoluteFill
-				style={{
-					justifyContent: 'flex-end',
-					alignItems: 'center',
-					paddingBottom: BAG_PADDING_BOTTOM,
-				}}
-			>
-				<Img
-					src={staticFile(BAG_CASH_IMAGE)}
-					style={{
-						width: BAG_WIDTH,
-						transform: `scale(${bagScale})`,
-					}}
-				/>
-			</AbsoluteFill>
+			<HookText />
+			<Bag scale={bagScale} />
 		</AbsoluteFill>
 	);
 };
@@ -197,8 +243,8 @@ const Scene2: React.FC = () => {
 // SCENE 3 — "No name. No note."
 // Frames 180-240 (6.0s-8.0s @ 30fps)
 //
-// - Same background, bag remains in its settled position/size (no text —
-//   the Scene 1 text exited at the Scene 1/2 cut and doesn't return).
+// - Same background; bag and "$1,000,000" text remain in their settled
+//   positions.
 // - blank-tag.png pops in near the bag's handle/shoulder, small and to the
 //   side, as if tied on. Local frames 0-30 (global 6.0s-7.0s): overshoot
 //   bounce. Local frames 30-60 (global 7.0s-8.0s): fully static hold.
@@ -207,15 +253,6 @@ const Scene2: React.FC = () => {
 const SCENE_3_VO = 'No name. No note.';
 const SCENE_3_DURATION = 60;
 const SCENE_3_TAG_SETTLE_FRAME = 30;
-
-const TAG_IMAGE = 'images/processed/blank-tag.png';
-const TAG_WIDTH_PX = 220;
-// Anchored near the bag's right shoulder/handle-base, just below the handle
-// loop (see BAG_WIDTH/BAG_PADDING_BOTTOM geometry). The tag's own loop sits
-// at its left edge, so the element is nudged left/up from this anchor
-// rather than centered on it.
-const TAG_ANCHOR_LEFT = '66%';
-const TAG_ANCHOR_TOP = '32%';
 
 const Scene3: React.FC = () => {
 	const frame = useCurrentFrame();
@@ -230,25 +267,49 @@ const Scene3: React.FC = () => {
 	return (
 		<AbsoluteFill>
 			<SceneBackground />
-			<AbsoluteFill
-				style={{
-					justifyContent: 'flex-end',
-					alignItems: 'center',
-					paddingBottom: BAG_PADDING_BOTTOM,
-				}}
-			>
-				<Img src={staticFile(BAG_CASH_IMAGE)} style={{width: BAG_WIDTH}} />
-			</AbsoluteFill>
-			<div
-				style={{
-					position: 'absolute',
-					left: TAG_ANCHOR_LEFT,
-					top: TAG_ANCHOR_TOP,
-					transform: `translate(-15%, -35%) scale(${tagScale})`,
-				}}
-			>
-				<Img src={staticFile(TAG_IMAGE)} style={{width: TAG_WIDTH_PX, display: 'block'}} />
-			</div>
+			<HookText />
+			<Bag />
+			<Tag scale={tagScale} />
+		</AbsoluteFill>
+	);
+};
+
+// ============================================================================
+// SCENE 4 — "First instinct? Most people think:"
+// Frames 240-330 (8.0s-11.0s @ 30fps)
+//
+// - Same background; bag, "$1,000,000" text, and tag remain in their
+//   settled positions.
+// - person-reaching.png pops in on the left, crouching and reaching toward
+//   the bag. Local frames 0-30 (global 8.0s-9.0s): overshoot bounce.
+//   Local frames 30-90 (global 9.0s-11.0s): fully static hold.
+// ============================================================================
+
+const SCENE_4_VO = 'First instinct? Most people think:';
+const SCENE_4_DURATION = 90;
+const SCENE_4_PERSON_SETTLE_FRAME = 30;
+
+const Scene4: React.FC = () => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+
+	const personScale = spring({
+		frame: Math.min(frame, SCENE_4_PERSON_SETTLE_FRAME),
+		fps,
+		config: {
+			damping: 9,
+			mass: 1,
+			stiffness: 100,
+		},
+	});
+
+	return (
+		<AbsoluteFill>
+			<SceneBackground />
+			<HookText />
+			<Bag />
+			<Tag />
+			<PersonReaching scale={personScale} />
 		</AbsoluteFill>
 	);
 };
@@ -284,7 +345,15 @@ export const Short: React.FC = () => {
 				<Scene3 />
 			</Sequence>
 
-			{/* Scene 4 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION} durationInFrames={...}> */}
+			<Sequence
+				from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION}
+				durationInFrames={SCENE_4_DURATION}
+				name={`Scene 4 — VO: "${SCENE_4_VO}"`}
+			>
+				<Scene4 />
+			</Sequence>
+
+			{/* Scene 5 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION} durationInFrames={...}> */}
 		</AbsoluteFill>
 	);
 };
