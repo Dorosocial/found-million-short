@@ -50,6 +50,12 @@ const SCENE_1_DURATION = 120;
 // spring asymptoting close enough to 1.
 const SCENE_1_SETTLE_FRAME = 60;
 
+// "$1,000,000" hook text: pops in on its own spring once the bag has mostly
+// settled, and is fully locked in well before the bag's own hold begins.
+const SCENE_1_TEXT = '$1,000,000';
+const SCENE_1_TEXT_START_FRAME = 30;
+const SCENE_1_TEXT_SETTLE_OFFSET = 20; // settles at frame 30 + 20 = 50
+
 const Scene1: React.FC = () => {
 	const frame = useCurrentFrame();
 	const {fps} = useVideoConfig();
@@ -67,9 +73,54 @@ const Scene1: React.FC = () => {
 		},
 	});
 
+	// Snappier, punchier bounce than the bag's: overshoots to ~124% around
+	// offset 4, dips to ~94% around offset 8, and settles by offset 20
+	// (i.e. frame 50). Clamped so the text is pixel-locked afterwards.
+	const textOffset = Math.min(
+		Math.max(0, frame - SCENE_1_TEXT_START_FRAME),
+		SCENE_1_TEXT_SETTLE_OFFSET,
+	);
+	const textScale = spring({
+		frame: textOffset,
+		fps,
+		config: {
+			damping: 10,
+			mass: 0.5,
+			stiffness: 300,
+		},
+	});
+	// Nothing to render before the pop-in starts.
+	const textVisible = frame >= SCENE_1_TEXT_START_FRAME;
+
 	return (
 		<AbsoluteFill>
 			<SceneBackground />
+			<AbsoluteFill
+				style={{
+					justifyContent: 'flex-start',
+					alignItems: 'center',
+					paddingTop: '15%',
+				}}
+			>
+				{textVisible ? (
+					<div
+						style={{
+							transform: `scale(${textScale})`,
+							fontFamily: 'Arial, Helvetica, sans-serif',
+							fontWeight: 900,
+							fontSize: 130,
+							color: '#ffffff',
+							textAlign: 'center',
+							WebkitTextStroke: '10px #000000',
+							paintOrder: 'stroke fill',
+							textShadow:
+								'0 0 30px rgba(34, 197, 94, 0.85), 0 0 70px rgba(34, 197, 94, 0.55)',
+						}}
+					>
+						{SCENE_1_TEXT}
+					</div>
+				) : null}
+			</AbsoluteFill>
 			<AbsoluteFill
 				style={{
 					justifyContent: 'flex-end',
