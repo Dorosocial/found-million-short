@@ -21,6 +21,7 @@ const BACKGROUND_IMAGE = 'images/processed/background.jpeg';
 const BAG_CASH_IMAGE = 'images/processed/bag-cash.png';
 const TAG_IMAGE = 'images/processed/blank-tag.png';
 const PERSON_REACHING_IMAGE = 'images/processed/person-reaching.png';
+const THOUGHT_BUBBLE_IMAGE = 'images/processed/thought-bubble.png';
 
 // Punchy, quick-settling spring shared by any element that needs a snappy
 // pop-in bounce inside a short (~20-30 frame) window, as opposed to the
@@ -130,6 +131,34 @@ const PersonReaching: React.FC<{scale?: number}> = ({scale = 1}) => (
 		<Img
 			src={staticFile(PERSON_REACHING_IMAGE)}
 			style={{width: PERSON_WIDTH_PX, display: 'block'}}
+		/>
+	</div>
+);
+
+// The bag's silhouette is wide and its left edge creeps in as it goes down
+// (from x~518 near the handle to x~200 near the shoulder), so there isn't
+// room for the bubble directly above the head (x=254, top=1078) without
+// its transparent halftone gaps letting the bag's dot pattern bleed
+// through. Positioned instead in the clear gap up and to the left of the
+// head, below the "$1,000,000" text (which ends around y=468) and clear
+// of the bag's edge (>=x~279 through this vertical range) down to y=740.
+const BUBBLE_WIDTH_PX = 230;
+const BUBBLE_LEFT_PX = 30;
+const BUBBLE_TOP_PX = 503;
+
+const ThoughtBubble: React.FC<{scale?: number}> = ({scale = 1}) => (
+	<div
+		style={{
+			position: 'absolute',
+			left: BUBBLE_LEFT_PX,
+			top: BUBBLE_TOP_PX,
+			transformOrigin: 'bottom center',
+			transform: `scale(${scale})`,
+		}}
+	>
+		<Img
+			src={staticFile(THOUGHT_BUBBLE_IMAGE)}
+			style={{width: BUBBLE_WIDTH_PX, display: 'block'}}
 		/>
 	</div>
 );
@@ -315,6 +344,43 @@ const Scene4: React.FC = () => {
 };
 
 // ============================================================================
+// SCENE 5 — "'It's mine now.'"
+// Frames 330-390 (11.0s-13.0s @ 30fps)
+//
+// - Same background; bag, "$1,000,000" text, tag, and person-reaching
+//   remain in their settled positions.
+// - thought-bubble.png (with a dollar sign) pops in above the character's
+//   head. Local frames 0-25 (global 11.0s-11.8s): overshoot bounce. Local
+//   frames 25-60 (global 11.8s-13.0s): fully static hold.
+// ============================================================================
+
+const SCENE_5_VO = "'It's mine now.'";
+const SCENE_5_DURATION = 60;
+const SCENE_5_BUBBLE_SETTLE_FRAME = 25;
+
+const Scene5: React.FC = () => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+
+	const bubbleScale = spring({
+		frame: Math.min(frame, SCENE_5_BUBBLE_SETTLE_FRAME),
+		fps,
+		config: FAST_BOUNCE_SPRING_CONFIG,
+	});
+
+	return (
+		<AbsoluteFill>
+			<SceneBackground />
+			<HookText />
+			<Bag />
+			<Tag />
+			<PersonReaching />
+			<ThoughtBubble scale={bubbleScale} />
+		</AbsoluteFill>
+	);
+};
+
+// ============================================================================
 // ROOT — sequences all scenes together in order
 // ============================================================================
 
@@ -353,7 +419,15 @@ export const Short: React.FC = () => {
 				<Scene4 />
 			</Sequence>
 
-			{/* Scene 5 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION} durationInFrames={...}> */}
+			<Sequence
+				from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION}
+				durationInFrames={SCENE_5_DURATION}
+				name={`Scene 5 — VO: "${SCENE_5_VO}"`}
+			>
+				<Scene5 />
+			</Sequence>
+
+			{/* Scene 6 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION} durationInFrames={...}> */}
 		</AbsoluteFill>
 	);
 };
