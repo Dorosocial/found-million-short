@@ -25,6 +25,7 @@ const TAG_IMAGE = 'images/processed/blank-tag.png';
 const PERSON_REACHING_IMAGE = 'images/processed/person-reaching.png';
 const THOUGHT_BUBBLE_IMAGE = 'images/processed/thought-bubble.png';
 const GAVEL_IMAGE = 'images/processed/gavel.png';
+const COURTHOUSE_IMAGE = 'images/processed/courthouse.png';
 
 // Punchy, quick-settling spring shared by any element that needs a snappy
 // pop-in bounce inside a short (~20-30 frame) window, as opposed to the
@@ -178,7 +179,11 @@ const ThoughtBubble: React.FC<{scale?: number; opacity?: number}> = ({scale = 1,
 const GAVEL_WIDTH = '58%';
 const GAVEL_PADDING_BOTTOM = '24%';
 
-const Gavel: React.FC<{scale?: number; translateY?: number}> = ({scale = 1, translateY = 0}) => (
+const Gavel: React.FC<{scale?: number; translateY?: number; opacity?: number}> = ({
+	scale = 1,
+	translateY = 0,
+	opacity = 1,
+}) => (
 	<AbsoluteFill
 		style={{
 			justifyContent: 'flex-end',
@@ -190,7 +195,32 @@ const Gavel: React.FC<{scale?: number; translateY?: number}> = ({scale = 1, tran
 			src={staticFile(GAVEL_IMAGE)}
 			style={{
 				width: GAVEL_WIDTH,
+				opacity,
 				transform: `translateY(${translateY}px) scale(${scale})`,
+			}}
+		/>
+	</AbsoluteFill>
+);
+
+// courthouse.png has a flat foundation like the bag/gavel, so it uses the
+// same bottom-anchored layout.
+const COURTHOUSE_WIDTH = '62%';
+const COURTHOUSE_PADDING_BOTTOM = '20%';
+
+const Courthouse: React.FC<{scale?: number; opacity?: number}> = ({scale = 1, opacity = 1}) => (
+	<AbsoluteFill
+		style={{
+			justifyContent: 'flex-end',
+			alignItems: 'center',
+			paddingBottom: COURTHOUSE_PADDING_BOTTOM,
+		}}
+	>
+		<Img
+			src={staticFile(COURTHOUSE_IMAGE)}
+			style={{
+				width: COURTHOUSE_WIDTH,
+				opacity,
+				transform: `scale(${scale})`,
 			}}
 		/>
 	</AbsoluteFill>
@@ -529,6 +559,80 @@ const Scene6: React.FC = () => {
 };
 
 // ============================================================================
+// SCENE 7 — "In many places, found money must be reported to authorities."
+// Frames 480-600 (16.0s-20.0s @ 30fps)
+//
+// - Same background; the Scene 6 dark/cool tint eases back toward neutral.
+// - "$1,000,000" text remains the persistent anchor.
+// - Local frames 0-15 (global 16.0s-16.5s): gavel fades + scales down to 0.
+// - Local frame 15 (global 16.5s): courthouse.png starts at scale 0,
+//   lower-center.
+// - Local frames 15-45 (global 16.5s-17.5s): courthouse springs up with an
+//   overshoot bounce (same floaty config as the bag/person entrances).
+// - Local frames 45-120 (global 17.5s-20.0s): courthouse holds static.
+// ============================================================================
+
+const SCENE_7_VO = 'In many places, found money must be reported to authorities.';
+const SCENE_7_DURATION = 120;
+
+const SCENE_7_GAVEL_EXIT_DURATION = 15; // local frames 0-15: gavel exits
+
+const SCENE_7_COURTHOUSE_START_FRAME = 15;
+const SCENE_7_COURTHOUSE_SETTLE_OFFSET = 30; // settles 30 frames later, at local 45
+
+// How long the Scene 6 tint takes to ease back to neutral, starting from
+// this scene's first frame.
+const SCENE_7_TINT_FADE_DURATION = 40;
+
+const Scene7: React.FC = () => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+
+	// Gavel exit: fades + scales down to 0 over the first 15 frames.
+	const gavelExitProgress = interpolate(frame, [0, SCENE_7_GAVEL_EXIT_DURATION], [1, 0], {
+		extrapolateLeft: 'clamp',
+		extrapolateRight: 'clamp',
+		easing: Easing.in(Easing.quad),
+	});
+	const gavelExitDone = frame >= SCENE_7_GAVEL_EXIT_DURATION;
+
+	// Courthouse entrance: same slow, floaty overshoot-bounce config as the
+	// bag/person entrances. Clamped so it's pixel-locked once settled.
+	const courthouseVisible = frame >= SCENE_7_COURTHOUSE_START_FRAME;
+	const courthouseOffset = Math.min(
+		Math.max(0, frame - SCENE_7_COURTHOUSE_START_FRAME),
+		SCENE_7_COURTHOUSE_SETTLE_OFFSET,
+	);
+	const courthouseScale = spring({
+		frame: courthouseOffset,
+		fps,
+		config: {
+			damping: 9,
+			mass: 1,
+			stiffness: 100,
+		},
+	});
+
+	// Tint eases back toward neutral from Scene 6's darker/cooler shift.
+	const tintOpacity = interpolate(
+		frame,
+		[0, SCENE_7_TINT_FADE_DURATION],
+		[TONE_TINT_MAX_OPACITY, 0],
+		{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+	);
+
+	return (
+		<AbsoluteFill>
+			<SceneBackground />
+			<AbsoluteFill style={{backgroundColor: TONE_TINT_COLOR, opacity: tintOpacity}} />
+			<HookText />
+			{gavelExitDone ? null : <Gavel scale={gavelExitProgress} opacity={gavelExitProgress} />}
+			{courthouseVisible ? <Courthouse scale={courthouseScale} /> : null}
+		</AbsoluteFill>
+	);
+};
+
+// ============================================================================
 // ROOT — sequences all scenes together in order
 // ============================================================================
 
@@ -583,7 +687,22 @@ export const Short: React.FC = () => {
 				<Scene6 />
 			</Sequence>
 
-			{/* Scene 7 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION + SCENE_6_DURATION} durationInFrames={...}> */}
+			<Sequence
+				from={
+					SCENE_1_DURATION +
+					SCENE_2_DURATION +
+					SCENE_3_DURATION +
+					SCENE_4_DURATION +
+					SCENE_5_DURATION +
+					SCENE_6_DURATION
+				}
+				durationInFrames={SCENE_7_DURATION}
+				name={`Scene 7 — VO: "${SCENE_7_VO}"`}
+			>
+				<Scene7 />
+			</Sequence>
+
+			{/* Scene 8 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION + SCENE_6_DURATION + SCENE_7_DURATION} durationInFrames={...}> */}
 		</AbsoluteFill>
 	);
 };
