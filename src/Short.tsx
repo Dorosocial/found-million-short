@@ -21,6 +21,11 @@ const BAG_CASH_IMAGE = 'images/processed/bag-cash.png';
 const BAG_WIDTH = '65%';
 const BAG_PADDING_BOTTOM = '20%';
 
+// Punchy, quick-settling spring shared by any element that needs a snappy
+// pop-in bounce inside a short (~20-30 frame) window, as opposed to the
+// bag's own slower, floatier bounce.
+const FAST_BOUNCE_SPRING_CONFIG = {damping: 10, mass: 0.5, stiffness: 300} as const;
+
 const SceneBackground: React.FC = () => (
 	<Img
 		src={staticFile(BACKGROUND_IMAGE)}
@@ -83,11 +88,7 @@ const Scene1: React.FC = () => {
 	const textScale = spring({
 		frame: textOffset,
 		fps,
-		config: {
-			damping: 10,
-			mass: 0.5,
-			stiffness: 300,
-		},
+		config: FAST_BOUNCE_SPRING_CONFIG,
 	});
 	// Nothing to render before the pop-in starts.
 	const textVisible = frame >= SCENE_1_TEXT_START_FRAME;
@@ -193,6 +194,66 @@ const Scene2: React.FC = () => {
 };
 
 // ============================================================================
+// SCENE 3 — "No name. No note."
+// Frames 180-240 (6.0s-8.0s @ 30fps)
+//
+// - Same background, bag remains in its settled position/size (no text —
+//   the Scene 1 text exited at the Scene 1/2 cut and doesn't return).
+// - blank-tag.png pops in near the bag's handle/shoulder, small and to the
+//   side, as if tied on. Local frames 0-30 (global 6.0s-7.0s): overshoot
+//   bounce. Local frames 30-60 (global 7.0s-8.0s): fully static hold.
+// ============================================================================
+
+const SCENE_3_VO = 'No name. No note.';
+const SCENE_3_DURATION = 60;
+const SCENE_3_TAG_SETTLE_FRAME = 30;
+
+const TAG_IMAGE = 'images/processed/blank-tag.png';
+const TAG_WIDTH_PX = 220;
+// Anchored near the bag's right shoulder/handle-base, just below the handle
+// loop (see BAG_WIDTH/BAG_PADDING_BOTTOM geometry). The tag's own loop sits
+// at its left edge, so the element is nudged left/up from this anchor
+// rather than centered on it.
+const TAG_ANCHOR_LEFT = '66%';
+const TAG_ANCHOR_TOP = '32%';
+
+const Scene3: React.FC = () => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+
+	const tagScale = spring({
+		frame: Math.min(frame, SCENE_3_TAG_SETTLE_FRAME),
+		fps,
+		config: FAST_BOUNCE_SPRING_CONFIG,
+	});
+
+	return (
+		<AbsoluteFill>
+			<SceneBackground />
+			<AbsoluteFill
+				style={{
+					justifyContent: 'flex-end',
+					alignItems: 'center',
+					paddingBottom: BAG_PADDING_BOTTOM,
+				}}
+			>
+				<Img src={staticFile(BAG_CASH_IMAGE)} style={{width: BAG_WIDTH}} />
+			</AbsoluteFill>
+			<div
+				style={{
+					position: 'absolute',
+					left: TAG_ANCHOR_LEFT,
+					top: TAG_ANCHOR_TOP,
+					transform: `translate(-15%, -35%) scale(${tagScale})`,
+				}}
+			>
+				<Img src={staticFile(TAG_IMAGE)} style={{width: TAG_WIDTH_PX, display: 'block'}} />
+			</div>
+		</AbsoluteFill>
+	);
+};
+
+// ============================================================================
 // ROOT — sequences all scenes together in order
 // ============================================================================
 
@@ -215,7 +276,15 @@ export const Short: React.FC = () => {
 				<Scene2 />
 			</Sequence>
 
-			{/* Scene 3 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION} durationInFrames={...}> */}
+			<Sequence
+				from={SCENE_1_DURATION + SCENE_2_DURATION}
+				durationInFrames={SCENE_3_DURATION}
+				name={`Scene 3 — VO: "${SCENE_3_VO}"`}
+			>
+				<Scene3 />
+			</Sequence>
+
+			{/* Scene 4 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION} durationInFrames={...}> */}
 		</AbsoluteFill>
 	);
 };
