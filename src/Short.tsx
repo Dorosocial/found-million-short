@@ -253,6 +253,65 @@ const Clipboard: React.FC<{scale?: number}> = ({scale = 1}) => (
 	</div>
 );
 
+// Plain SVG arrow (no image asset) from roughly the bag's old center
+// (it exited back in Scene 6, but this is the same screen area) toward the
+// clipboard. Drawn as two overlaid lines (thicker black behind, white on
+// top) so it reads clearly against the busy background, matching the
+// black-outline/white-fill look used elsewhere (e.g. the hook text).
+const ARROW_START = {x: 520, y: 1120};
+const ARROW_END = {x: 800, y: 860};
+const ARROW_LENGTH = Math.hypot(ARROW_END.x - ARROW_START.x, ARROW_END.y - ARROW_START.y);
+const ARROW_ANGLE_DEG =
+	Math.atan2(ARROW_END.y - ARROW_START.y, ARROW_END.x - ARROW_START.x) * (180 / Math.PI);
+const ARROW_HEAD_SIZE = 34;
+const ARROW_STROKE_WIDTH = 12;
+
+const Arrow: React.FC<{progress?: number}> = ({progress = 1}) => {
+	// The arrowhead only pops in right at the very end of the draw, once the
+	// shaft has actually reached it.
+	const headOpacity = interpolate(progress, [0.92, 1], [0, 1], {
+		extrapolateLeft: 'clamp',
+		extrapolateRight: 'clamp',
+	});
+	const dashOffset = ARROW_LENGTH * (1 - progress);
+	const headPoints = `0,0 ${-ARROW_HEAD_SIZE},${-ARROW_HEAD_SIZE * 0.62} ${-ARROW_HEAD_SIZE},${ARROW_HEAD_SIZE * 0.62}`;
+
+	return (
+		<svg
+			width={1080}
+			height={1920}
+			style={{position: 'absolute', top: 0, left: 0}}
+			viewBox="0 0 1080 1920"
+		>
+			<line
+				x1={ARROW_START.x}
+				y1={ARROW_START.y}
+				x2={ARROW_END.x}
+				y2={ARROW_END.y}
+				stroke="#000000"
+				strokeWidth={ARROW_STROKE_WIDTH + 6}
+				strokeLinecap="round"
+				strokeDasharray={ARROW_LENGTH}
+				strokeDashoffset={dashOffset}
+			/>
+			<line
+				x1={ARROW_START.x}
+				y1={ARROW_START.y}
+				x2={ARROW_END.x}
+				y2={ARROW_END.y}
+				stroke="#ffffff"
+				strokeWidth={ARROW_STROKE_WIDTH}
+				strokeLinecap="round"
+				strokeDasharray={ARROW_LENGTH}
+				strokeDashoffset={dashOffset}
+			/>
+			<g transform={`translate(${ARROW_END.x}, ${ARROW_END.y}) rotate(${ARROW_ANGLE_DEG})`} opacity={headOpacity}>
+				<polygon points={headPoints} fill="#ffffff" stroke="#000000" strokeWidth={6} strokeLinejoin="round" />
+			</g>
+		</svg>
+	);
+};
+
 // ============================================================================
 // SCENE 1 — "What if you randomly found $1,000,000… in cash?"
 // Frames 0-120 (0.0s-4.0s @ 30fps)
@@ -699,6 +758,44 @@ const Scene8: React.FC = () => {
 };
 
 // ============================================================================
+// SCENE 9 — "you have to return it."
+// Frames 690-750 (23.0s-25.0s @ 30fps)
+//
+// - Same background; "$1,000,000" text remains the persistent anchor.
+// - courthouse.png and clipboard.png stay put from Scene 8 - no exit,
+//   still the same accumulating argument.
+// - Local frame 0 (global 23.0s): arrow starts undrawn (0% path length),
+//   from roughly the bag's old position, pointing at the clipboard.
+// - Local frames 0-30 (global 23.0s-24.0s): arrow draws itself along its
+//   path via interpolate() - a smooth, deliberate reveal, not a spring.
+// - Local frames 30-60 (global 24.0s-25.0s): arrow holds fully drawn.
+// ============================================================================
+
+const SCENE_9_VO = 'you have to return it.';
+const SCENE_9_DURATION = 60;
+const SCENE_9_ARROW_DRAW_DURATION = 30;
+
+const Scene9: React.FC = () => {
+	const frame = useCurrentFrame();
+
+	const arrowProgress = interpolate(frame, [0, SCENE_9_ARROW_DRAW_DURATION], [0, 1], {
+		extrapolateLeft: 'clamp',
+		extrapolateRight: 'clamp',
+		easing: Easing.inOut(Easing.quad),
+	});
+
+	return (
+		<AbsoluteFill>
+			<SceneBackground />
+			<HookText />
+			<Courthouse />
+			<Clipboard />
+			<Arrow progress={arrowProgress} />
+		</AbsoluteFill>
+	);
+};
+
+// ============================================================================
 // ROOT — sequences all scenes together in order
 // ============================================================================
 
@@ -784,7 +881,24 @@ export const Short: React.FC = () => {
 				<Scene8 />
 			</Sequence>
 
-			{/* Scene 9 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION + SCENE_6_DURATION + SCENE_7_DURATION + SCENE_8_DURATION} durationInFrames={...}> */}
+			<Sequence
+				from={
+					SCENE_1_DURATION +
+					SCENE_2_DURATION +
+					SCENE_3_DURATION +
+					SCENE_4_DURATION +
+					SCENE_5_DURATION +
+					SCENE_6_DURATION +
+					SCENE_7_DURATION +
+					SCENE_8_DURATION
+				}
+				durationInFrames={SCENE_9_DURATION}
+				name={`Scene 9 — VO: "${SCENE_9_VO}"`}
+			>
+				<Scene9 />
+			</Sequence>
+
+			{/* Scene 10 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION + SCENE_6_DURATION + SCENE_7_DURATION + SCENE_8_DURATION + SCENE_9_DURATION} durationInFrames={...}> */}
 		</AbsoluteFill>
 	);
 };
