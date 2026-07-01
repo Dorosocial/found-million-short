@@ -26,6 +26,10 @@ const PERSON_REACHING_IMAGE = 'images/processed/person-reaching.png';
 const THOUGHT_BUBBLE_IMAGE = 'images/processed/thought-bubble.png';
 const GAVEL_IMAGE = 'images/processed/gavel.png';
 const COURTHOUSE_IMAGE = 'images/processed/courthouse.png';
+// There is no clipboard.png among the processed assets; document-magnifier.png
+// (a clipboard holding a document, with a magnifying glass) is the closest
+// visual match and reads as "clipboard" in context, so it stands in here.
+const CLIPBOARD_IMAGE = 'images/processed/document-magnifier.png';
 
 // Punchy, quick-settling spring shared by any element that needs a snappy
 // pop-in bounce inside a short (~20-30 frame) window, as opposed to the
@@ -224,6 +228,29 @@ const Courthouse: React.FC<{scale?: number; opacity?: number}> = ({scale = 1, op
 			}}
 		/>
 	</AbsoluteFill>
+);
+
+// The courthouse's roofline is narrow (right edge ~x557-664 from about
+// y580-810) but its base flares out fast below that (right edge ~x780-840
+// from y840 down). Positioned beside the tower, clear of the widened base
+// down to y~966 (courthouse edge there is still only ~782, well under
+// CLIPBOARD_LEFT_PX), so its dense halftone dots don't bleed into the
+// clipboard's own transparent gaps the way the Scene 5 bubble/bag did.
+const CLIPBOARD_WIDTH_PX = 260;
+const CLIPBOARD_LEFT_PX = 820;
+const CLIPBOARD_TOP_PX = 500;
+
+const Clipboard: React.FC<{scale?: number}> = ({scale = 1}) => (
+	<div
+		style={{
+			position: 'absolute',
+			left: CLIPBOARD_LEFT_PX,
+			top: CLIPBOARD_TOP_PX,
+			transform: `scale(${scale})`,
+		}}
+	>
+		<Img src={staticFile(CLIPBOARD_IMAGE)} style={{width: CLIPBOARD_WIDTH_PX, display: 'block'}} />
+	</div>
 );
 
 // ============================================================================
@@ -633,6 +660,45 @@ const Scene7: React.FC = () => {
 };
 
 // ============================================================================
+// SCENE 8 — "Because if someone else can prove it's theirs…"
+// Frames 600-690 (20.0s-23.0s @ 30fps)
+//
+// - Same background; "$1,000,000" text remains the persistent anchor.
+// - courthouse.png stays put from Scene 7 - no exit, this scene builds on
+//   the same argument.
+// - Local frame 0 (global 20.0s): clipboard starts at scale 0, to the
+//   side of the courthouse.
+// - Local frames 0-25 (global 20.0s-20.8s): clipboard springs in with an
+//   overshoot bounce.
+// - Local frames 25-90 (global 20.8s-23.0s): clipboard holds static
+//   alongside the courthouse.
+// ============================================================================
+
+const SCENE_8_VO = "Because if someone else can prove it's theirs…";
+const SCENE_8_DURATION = 90;
+const SCENE_8_CLIPBOARD_SETTLE_FRAME = 25;
+
+const Scene8: React.FC = () => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+
+	const clipboardScale = spring({
+		frame: Math.min(frame, SCENE_8_CLIPBOARD_SETTLE_FRAME),
+		fps,
+		config: FAST_BOUNCE_SPRING_CONFIG,
+	});
+
+	return (
+		<AbsoluteFill>
+			<SceneBackground />
+			<HookText />
+			<Courthouse />
+			<Clipboard scale={clipboardScale} />
+		</AbsoluteFill>
+	);
+};
+
+// ============================================================================
 // ROOT — sequences all scenes together in order
 // ============================================================================
 
@@ -702,7 +768,23 @@ export const Short: React.FC = () => {
 				<Scene7 />
 			</Sequence>
 
-			{/* Scene 8 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION + SCENE_6_DURATION + SCENE_7_DURATION} durationInFrames={...}> */}
+			<Sequence
+				from={
+					SCENE_1_DURATION +
+					SCENE_2_DURATION +
+					SCENE_3_DURATION +
+					SCENE_4_DURATION +
+					SCENE_5_DURATION +
+					SCENE_6_DURATION +
+					SCENE_7_DURATION
+				}
+				durationInFrames={SCENE_8_DURATION}
+				name={`Scene 8 — VO: "${SCENE_8_VO}"`}
+			>
+				<Scene8 />
+			</Sequence>
+
+			{/* Scene 9 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION + SCENE_6_DURATION + SCENE_7_DURATION + SCENE_8_DURATION} durationInFrames={...}> */}
 		</AbsoluteFill>
 	);
 };
