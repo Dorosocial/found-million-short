@@ -1,8 +1,10 @@
 import React from 'react';
 import {
 	AbsoluteFill,
+	Easing,
 	Img,
 	Sequence,
+	interpolate,
 	spring,
 	staticFile,
 	useCurrentFrame,
@@ -22,6 +24,7 @@ const BAG_CASH_IMAGE = 'images/processed/bag-cash.png';
 const TAG_IMAGE = 'images/processed/blank-tag.png';
 const PERSON_REACHING_IMAGE = 'images/processed/person-reaching.png';
 const THOUGHT_BUBBLE_IMAGE = 'images/processed/thought-bubble.png';
+const GAVEL_IMAGE = 'images/processed/gavel.png';
 
 // Punchy, quick-settling spring shared by any element that needs a snappy
 // pop-in bounce inside a short (~20-30 frame) window, as opposed to the
@@ -42,7 +45,7 @@ const SceneBackground: React.FC = () => (
 const BAG_WIDTH = '65%';
 const BAG_PADDING_BOTTOM = '20%';
 
-const Bag: React.FC<{scale?: number}> = ({scale = 1}) => (
+const Bag: React.FC<{scale?: number; opacity?: number}> = ({scale = 1, opacity = 1}) => (
 	<AbsoluteFill
 		style={{
 			justifyContent: 'flex-end',
@@ -54,6 +57,7 @@ const Bag: React.FC<{scale?: number}> = ({scale = 1}) => (
 			src={staticFile(BAG_CASH_IMAGE)}
 			style={{
 				width: BAG_WIDTH,
+				opacity,
 				transform: `scale(${scale})`,
 			}}
 		/>
@@ -95,12 +99,13 @@ const TAG_WIDTH_PX = 220;
 const TAG_ANCHOR_LEFT = '66%';
 const TAG_ANCHOR_TOP = '32%';
 
-const Tag: React.FC<{scale?: number}> = ({scale = 1}) => (
+const Tag: React.FC<{scale?: number; opacity?: number}> = ({scale = 1, opacity = 1}) => (
 	<div
 		style={{
 			position: 'absolute',
 			left: TAG_ANCHOR_LEFT,
 			top: TAG_ANCHOR_TOP,
+			opacity,
 			transform: `translate(-15%, -35%) scale(${scale})`,
 		}}
 	>
@@ -118,12 +123,13 @@ const PERSON_WIDTH_PX = 500;
 const PERSON_LEFT_PX = 0;
 const PERSON_TOP_PX = 851;
 
-const PersonReaching: React.FC<{scale?: number}> = ({scale = 1}) => (
+const PersonReaching: React.FC<{scale?: number; opacity?: number}> = ({scale = 1, opacity = 1}) => (
 	<div
 		style={{
 			position: 'absolute',
 			left: PERSON_LEFT_PX,
 			top: PERSON_TOP_PX,
+			opacity,
 			transformOrigin: 'bottom left',
 			transform: `scale(${scale})`,
 		}}
@@ -146,12 +152,13 @@ const BUBBLE_WIDTH_PX = 230;
 const BUBBLE_LEFT_PX = 30;
 const BUBBLE_TOP_PX = 503;
 
-const ThoughtBubble: React.FC<{scale?: number}> = ({scale = 1}) => (
+const ThoughtBubble: React.FC<{scale?: number; opacity?: number}> = ({scale = 1, opacity = 1}) => (
 	<div
 		style={{
 			position: 'absolute',
 			left: BUBBLE_LEFT_PX,
 			top: BUBBLE_TOP_PX,
+			opacity,
 			transformOrigin: 'bottom center',
 			transform: `scale(${scale})`,
 		}}
@@ -161,6 +168,32 @@ const ThoughtBubble: React.FC<{scale?: number}> = ({scale = 1}) => (
 			style={{width: BUBBLE_WIDTH_PX, display: 'block'}}
 		/>
 	</div>
+);
+
+// gavel.png already depicts the gavel head down on its sounding block (a
+// struck pose), so no separate "impact" artwork is needed - only the
+// entrance (falling from off-screen top) needs animating. Takes the same
+// bottom-anchored layout as the bag, in the same spot the bag vacates when
+// it exits in Scene 6.
+const GAVEL_WIDTH = '58%';
+const GAVEL_PADDING_BOTTOM = '24%';
+
+const Gavel: React.FC<{scale?: number; translateY?: number}> = ({scale = 1, translateY = 0}) => (
+	<AbsoluteFill
+		style={{
+			justifyContent: 'flex-end',
+			alignItems: 'center',
+			paddingBottom: GAVEL_PADDING_BOTTOM,
+		}}
+	>
+		<Img
+			src={staticFile(GAVEL_IMAGE)}
+			style={{
+				width: GAVEL_WIDTH,
+				transform: `translateY(${translateY}px) scale(${scale})`,
+			}}
+		/>
+	</AbsoluteFill>
 );
 
 // ============================================================================
@@ -381,6 +414,121 @@ const Scene5: React.FC = () => {
 };
 
 // ============================================================================
+// SCENE 6 — "But legally… it's NOT that simple"
+// Frames 390-480 (13.0s-16.0s @ 30fps)
+//
+// - Same background; "$1,000,000" text is the one persistent anchor and
+//   stays untouched all the way through.
+// - Local frames 0-15 (global 13.0s-13.5s): bag, tag, person-reaching, and
+//   the thought bubble all fade + scale down to 0 together.
+// - Local frame 15 (global 13.5s): gavel.png starts off-screen top, scale 0.
+// - Local frames 15-30 (global 13.5s-14.0s): gavel drops in fast on a
+//   high-damping (near-zero overshoot) spring - a hard, sudden strike.
+// - Local frame 30 (global 14.0s): impact - a brief flash + screen shake.
+// - Local frames 30-90 (global 14.0s-16.0s): gavel holds in its struck
+//   position; a cool/dark tint fades in over the background to mark the
+//   tone shift.
+// ============================================================================
+
+const SCENE_6_VO = "But legally… it's NOT that simple";
+const SCENE_6_DURATION = 90;
+
+const SCENE_6_EXIT_DURATION = 15; // local frames 0-15: old objects exit
+
+const SCENE_6_GAVEL_START_FRAME = 15; // local frame the gavel starts dropping
+const SCENE_6_GAVEL_SETTLE_OFFSET = 15; // settles 15 frames later, at local 30
+const GAVEL_DROP_START_Y = -2000; // comfortably off the top of the frame
+const GAVEL_ENTRANCE_SPRING_CONFIG = {damping: 40, mass: 0.8, stiffness: 400} as const; // high damping: fast, ~no overshoot
+
+const SCENE_6_IMPACT_FRAME = SCENE_6_GAVEL_START_FRAME + SCENE_6_GAVEL_SETTLE_OFFSET; // local 30
+const TONE_TINT_COLOR = '#040f1f';
+const TONE_TINT_MAX_OPACITY = 0.4;
+
+const Scene6: React.FC = () => {
+	const frame = useCurrentFrame();
+	const {fps} = useVideoConfig();
+
+	// Exit: previous scene's objects fade + scale down to 0 together, over
+	// the first 15 frames, with an ease-in so the shrink accelerates out.
+	const exitProgress = interpolate(frame, [0, SCENE_6_EXIT_DURATION], [1, 0], {
+		extrapolateLeft: 'clamp',
+		extrapolateRight: 'clamp',
+		easing: Easing.in(Easing.quad),
+	});
+	const exitDone = frame >= SCENE_6_EXIT_DURATION;
+
+	// Gavel entrance: clamped so it's pixel-locked in its struck position
+	// once settled (local frame 30 onward).
+	const gavelVisible = frame >= SCENE_6_GAVEL_START_FRAME;
+	const gavelOffset = Math.min(
+		Math.max(0, frame - SCENE_6_GAVEL_START_FRAME),
+		SCENE_6_GAVEL_SETTLE_OFFSET,
+	);
+	const gavelProgress = spring({
+		frame: gavelOffset,
+		fps,
+		config: GAVEL_ENTRANCE_SPRING_CONFIG,
+	});
+	const gavelTranslateY = interpolate(gavelProgress, [0, 1], [GAVEL_DROP_START_Y, 0]);
+
+	// Impact flash: a brief, bright hit right as the gavel lands, gone within
+	// a handful of frames.
+	const flashOpacity = interpolate(
+		frame,
+		[
+			SCENE_6_IMPACT_FRAME - 1,
+			SCENE_6_IMPACT_FRAME,
+			SCENE_6_IMPACT_FRAME + 2,
+			SCENE_6_IMPACT_FRAME + 6,
+		],
+		[0, 0.85, 0.3, 0],
+		{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+	);
+
+	// Impact shake: a quick jolt applied to the whole frame, decaying to
+	// nothing within a few frames of landing.
+	const shakeX = interpolate(
+		frame,
+		[SCENE_6_IMPACT_FRAME - 1, SCENE_6_IMPACT_FRAME, SCENE_6_IMPACT_FRAME + 1, SCENE_6_IMPACT_FRAME + 3],
+		[0, 9, -6, 0],
+		{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+	);
+	const shakeY = interpolate(
+		frame,
+		[SCENE_6_IMPACT_FRAME - 1, SCENE_6_IMPACT_FRAME, SCENE_6_IMPACT_FRAME + 1, SCENE_6_IMPACT_FRAME + 3],
+		[0, -6, 5, 0],
+		{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+	);
+
+	// Tone-shift tint: fades in just after impact and holds for the rest of
+	// the scene.
+	const tintOpacity = interpolate(
+		frame,
+		[SCENE_6_IMPACT_FRAME, SCENE_6_IMPACT_FRAME + 10],
+		[0, TONE_TINT_MAX_OPACITY],
+		{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
+	);
+
+	return (
+		<AbsoluteFill style={{transform: `translate(${shakeX}px, ${shakeY}px)`}}>
+			<SceneBackground />
+			<AbsoluteFill style={{backgroundColor: TONE_TINT_COLOR, opacity: tintOpacity}} />
+			<HookText />
+			{exitDone ? null : (
+				<>
+					<Bag scale={exitProgress} opacity={exitProgress} />
+					<Tag scale={exitProgress} opacity={exitProgress} />
+					<PersonReaching scale={exitProgress} opacity={exitProgress} />
+					<ThoughtBubble scale={exitProgress} opacity={exitProgress} />
+				</>
+			)}
+			{gavelVisible ? <Gavel scale={gavelProgress} translateY={gavelTranslateY} /> : null}
+			<AbsoluteFill style={{backgroundColor: '#ffffff', opacity: flashOpacity}} />
+		</AbsoluteFill>
+	);
+};
+
+// ============================================================================
 // ROOT — sequences all scenes together in order
 // ============================================================================
 
@@ -427,7 +575,15 @@ export const Short: React.FC = () => {
 				<Scene5 />
 			</Sequence>
 
-			{/* Scene 6 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION} durationInFrames={...}> */}
+			<Sequence
+				from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION}
+				durationInFrames={SCENE_6_DURATION}
+				name={`Scene 6 — VO: "${SCENE_6_VO}"`}
+			>
+				<Scene6 />
+			</Sequence>
+
+			{/* Scene 7 goes here: <Sequence from={SCENE_1_DURATION + SCENE_2_DURATION + SCENE_3_DURATION + SCENE_4_DURATION + SCENE_5_DURATION + SCENE_6_DURATION} durationInFrames={...}> */}
 		</AbsoluteFill>
 	);
 };
